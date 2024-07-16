@@ -1,0 +1,69 @@
+pipeline {
+    agent any
+    
+    tools {
+        maven 'mymaven'
+    }
+    
+    environment {
+        S3_BUCKET = 'fullcicd190'
+        ARTIFACT_PATH = 'target/mahaLogin-5.0.war'
+    }
+
+    stages {
+        stage('Checkout Code from Git') {
+            steps {
+                echo 'Checking out code from Git...'
+                git branch: 'main', url: 'https://github.com/knbtechnosys/JAVA_Project_6pm.git'
+                echo 'Code checked out successfully.'
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                echo 'Building the project with Maven...'
+                sh 'mvn clean install'
+                echo 'Build completed.'
+            }
+        }
+        
+        stage('Verify Artifact') {
+            steps {
+                script {
+                    if (fileExists("${ARTIFACT_PATH}")) {
+                        echo "Artifact ${ARTIFACT_PATH} found."
+                    } else {
+                        error "Artifact ${ARTIFACT_PATH} not found!"
+                    }
+                }
+            }
+        }
+        
+        stage('Upload to S3') {
+            steps {
+                script {
+                    withCredentials([[
+                        $class: 'AmazonWebservicesCredentialsBinding',
+                        credentialsId: 'f8a9b2b8-3c86-46b3-ac06-1cfb88a55ce9'
+                    ]]) {
+                        echo "Uploading ${ARTIFACT_PATH} to S3 bucket ${S3_BUCKET}..."
+                        sh "aws s3 cp ${ARTIFACT_PATH} s3://${S3_BUCKET}/mahaLogin-5.0.war"
+                        echo 'Upload completed.'
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Pipeline finished.'
+        }
+        success {
+            echo 'Pipeline succeeded.'
+        }
+        failure {
+            echo 'Pipeline failed.'
+        }
+    }
+}
